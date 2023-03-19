@@ -1,8 +1,8 @@
-import { executeOldCommand } from "./api";
+import { executeNewCommand, executeOldCommand } from "./api";
 import { BrobCommand } from "./brob-command";
 import { VickCommand } from "./vick-command";
 
 export function main() {
-    executeOldCommand(BrobCommand);
+    executeNewCommand(BrobCommand);
     executeOldCommand(VickCommand);
 }
