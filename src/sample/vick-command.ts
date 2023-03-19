@@ -1,2 +1,2 @@
-class VickCommand {
+export class VickCommand {
 }

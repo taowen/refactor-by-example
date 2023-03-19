@@ -1,2 +1,2 @@
-class BrobCommand {
+export class BrobCommand {
 }
