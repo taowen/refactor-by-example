@@ -9,7 +9,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -17,7 +17,15 @@
         "command": "refactor-by-example.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "views": {
+      "scm": [
+        {
+          "id": "refactoringExamples",
+          "name": "Refactoring Examples"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",

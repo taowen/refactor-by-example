@@ -2,6 +2,23 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+export class RefactoringExamplesProvider implements vscode.TreeDataProvider<string> {
+	onDidChangeTreeData?: vscode.Event<string | void | string[] | null | undefined> | undefined;
+	getTreeItem(element: string): vscode.TreeItem | Thenable<vscode.TreeItem> {
+		return new vscode.TreeItem(element)
+	}
+	getChildren(element?: string | undefined): vscode.ProviderResult<string[]> {
+		return ['a', 'b', 'c']
+	}
+	getParent?(element: string): vscode.ProviderResult<string> {
+		return null;
+	}
+	resolveTreeItem?(item: vscode.TreeItem, element: string, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TreeItem> {
+		return null;
+	}
+
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -18,6 +35,10 @@ export function activate(context: vscode.ExtensionContext) {
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from refactor-by-example!');
 	});
+
+	vscode.window.createTreeView('refactoringExamples', {
+		treeDataProvider: new RefactoringExamplesProvider()
+	  });
 
 	context.subscriptions.push(disposable);
 }
