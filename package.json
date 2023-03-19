@@ -9,15 +9,25 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "refactor-by-example.helloWorld",
-        "title": "Hello World"
+        "command": "refactor-by-example.refactor",
+        "title": "Refactor by example"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "refactor-by-example.refactor",
+          "when": "false"
+        }
+      ]
+    },
     "views": {
       "scm": [
         {

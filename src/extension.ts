@@ -4,19 +4,20 @@ import * as vscode from 'vscode';
 
 export class RefactoringExamplesProvider implements vscode.TreeDataProvider<string> {
 	onDidChangeTreeData?: vscode.Event<string | void | string[] | null | undefined> | undefined;
-	getTreeItem(element: string): vscode.TreeItem | Thenable<vscode.TreeItem> {
-		return new vscode.TreeItem(element)
+	getTreeItem(exampleId: string): vscode.TreeItem | Thenable<vscode.TreeItem> {
+		const treeItem = new vscode.TreeItem(exampleId);
+		treeItem.command = {command:'refactor-by-example.refactor',title:'refactor',arguments:[exampleId]};
+		return treeItem
 	}
-	getChildren(element?: string | undefined): vscode.ProviderResult<string[]> {
+	getChildren(exampleId?: string | undefined): vscode.ProviderResult<string[]> {
 		return ['a', 'b', 'c']
 	}
-	getParent?(element: string): vscode.ProviderResult<string> {
+	getParent?(exampleId: string): vscode.ProviderResult<string> {
 		return null;
 	}
-	resolveTreeItem?(item: vscode.TreeItem, element: string, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TreeItem> {
+	resolveTreeItem?(item: vscode.TreeItem, exampleId: string, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TreeItem> {
 		return null;
 	}
-
 }
 
 // This method is called when your extension is activated
@@ -30,7 +31,8 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('refactor-by-example.helloWorld', () => {
+	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', (exampleId) => {
+		console.log(exampleId)
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from refactor-by-example!');
