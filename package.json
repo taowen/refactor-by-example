@@ -35,6 +35,21 @@
           "name": "Refactoring Examples"
         }
       ]
+    },
+    "configuration": {
+      "title": "refactorByExample",
+      "properties": {
+        "refactorByExample.apiUrl": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "URL to openai api service"
+        },
+        "refactorByExample.apiKey": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Secret api key"
+        }
+      }
     }
   },
   "scripts": {

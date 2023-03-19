@@ -36,9 +36,10 @@ const execShell = (cmd: string) =>
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "refactor-by-example" is now active!');
+	const conf = vscode.workspace.getConfiguration('refactorByExample');
+	const apiUrl = conf.get<string>('apiUrl');
+	const apiKey = conf.get<string>('apiKey');
+	console.log({ apiUrl, apiKey })
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
