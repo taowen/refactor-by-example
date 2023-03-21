@@ -3,6 +3,29 @@
 import * as vscode from 'vscode';
 import * as childProcess from 'child_process'
 import { parsePatch } from './parsePatch';
+import * as fs from 'fs'
+import * as path from 'path'
+
+
+function getWorkspaceDir() {
+	if (!vscode.workspace.workspaceFolders) {
+		return undefined;
+	}
+	return vscode.workspace.workspaceFolders[0].uri.fsPath;
+}
+
+async function getExamples() {
+	const workspaceDir = getWorkspaceDir();
+	if (!workspaceDir) {
+		return {}
+	}
+	const configFile = path.join(workspaceDir, '.refactor-by-example.json');
+	if (!fs.existsSync(configFile)) {
+		await fs.promises.writeFile(configFile, '{}');
+	}
+	const configContent = await fs.promises.readFile(configFile, { encoding: 'utf-8' })
+	return JSON.parse(configContent)
+}
 
 export class RefactoringExamplesProvider implements vscode.TreeDataProvider<string> {
 	onDidChangeTreeData?: vscode.Event<string | void | string[] | null | undefined> | undefined;
@@ -11,8 +34,8 @@ export class RefactoringExamplesProvider implements vscode.TreeDataProvider<stri
 		treeItem.command = {command:'refactor-by-example.refactor',title:'refactor',arguments:[exampleId]};
 		return treeItem
 	}
-	getChildren(exampleId?: string | undefined): vscode.ProviderResult<string[]> {
-		return ['a', 'b', 'c']
+	async getChildren(exampleId?: string | undefined): Promise<string[]> {
+		return Object.keys(await getExamples())
 	}
 	getParent?(exampleId: string): vscode.ProviderResult<string> {
 		return null;
@@ -22,9 +45,9 @@ export class RefactoringExamplesProvider implements vscode.TreeDataProvider<stri
 	}
 }
 
-const execShell = (cmd: string) =>
+const execShell = (cmd: string, options: childProcess.ExecOptions) =>
     new Promise<string>((resolve, reject) => {
-        childProcess.exec(cmd, (err, out) => {
+        childProcess.exec(cmd, options, (err, out) => {
             if (err) {
                 return reject(err);
             }
@@ -45,7 +68,17 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', async (exampleId) => {
-		const patchContent = await execShell('git show 1427971b3ee60a1df71b4c6cc34ed63eb623edf9')
+		const workspaceDir = getWorkspaceDir();
+		if (!workspaceDir) {
+			return;
+		}
+		const examples = await getExamples();
+		const example = examples[exampleId]
+		if (!example?.commit) {
+			console.log('missing commit from example')
+			return;
+		}
+		const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
 		const blocks = parsePatch(patchContent);
 		console.log(blocks)
 	});
