@@ -96,6 +96,18 @@ async function openaiComplete(content: string) {
 		req.end();
 	})
 }
+
+function isCoveredBy(locs: vscode.LocationLink[], ref: vscode.Location) {
+	for (const loc of locs) {
+		if (loc.targetUri.path !== ref.uri.path) {
+			continue
+		}
+		if (loc.targetRange.contains(ref.range)) {
+			return true;
+		}
+	}
+	return false;
+}
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -104,50 +116,68 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', async (exampleId) => {
-		const workspaceDir = getWorkspaceDir();
-		if (!workspaceDir) {
-			return;
-		}
+		// const workspaceDir = getWorkspaceDir();
+		// if (!workspaceDir) {
+		// 	return;
+		// }
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
 			return;
 		}
 		const selectionText = editor.document.getText(editor.selection)
-		const examples = await getExamples();
-		const example = examples[exampleId]
-		if (!example?.commit) {
-			console.log('missing commit from example')
-			return;
+		// const examples = await getExamples();
+		// const example = examples[exampleId]
+		// if (!example?.commit) {
+		// 	console.log('missing commit from example')
+		// 	return;
+		// }
+		// if (!example?.symbol) {
+		// 	console.log('missing symbol from example')
+		// 	return;
+		// }
+		// const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
+		// const blocks = parsePatch(patchContent);
+		// const promptLines = ['extract symbol from code snippets:', '===code snippets==='];
+		// for(const block of blocks) {
+		// 	if (block.oldContent) {
+		// 		promptLines.push('```')
+		// 		promptLines.push(block.oldContent);
+		// 		promptLines.push('```')
+		// 	}
+		// }
+		// promptLines.push('===symbol===')
+		// promptLines.push(example.symbol)
+		// promptLines.push('===code snippets===')
+		// promptLines.push('````')
+		// promptLines.push(selectionText)
+		// promptLines.push('````')
+		// promptLines.push('===symbol===')
+		// const toRefactorSymbol = await openaiComplete(promptLines.join('\n'))
+		// vscode.window
+		// 	.showInformationMessage(`Do you want to refactor ${toRefactorSymbol}`, "Yes", "No")
+		// 	.then(answer => {
+		// 		if (answer === "Yes") {
+		// 		// Run function
+		// 		}
+		// 	})
+		const relativePos = selectionText.indexOf('VickCommand');
+		const absPos = editor.selection.start.translate(undefined, relativePos)
+		const defs: Thenable<vscode.LocationLink[]> = vscode.commands.executeCommand('vscode.executeDefinitionProvider', editor.document.uri, absPos)
+		const decls: Thenable<vscode.LocationLink[]> = vscode.commands.executeCommand('vscode.executeDeclarationProvider', editor.document.uri, absPos)
+		const refs: Thenable<vscode.Location[]> = vscode.commands.executeCommand('vscode.executeReferenceProvider', editor.document.uri, absPos)
+		const locs = [...await defs, ...await decls]
+		for (const loc of locs) {
+			const locDoc = await vscode.workspace.openTextDocument(loc.targetUri);
+			console.log(locDoc.getText(loc.targetRange))
 		}
-		if (!example?.symbol) {
-			console.log('missing symbol from example')
-			return;
-		}
-		const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
-		const blocks = parsePatch(patchContent);
-		const promptLines = ['extract symbol from code snippets:', '===code snippets==='];
-		for(const block of blocks) {
-			if (block.oldContent) {
-				promptLines.push('```')
-				promptLines.push(block.oldContent);
-				promptLines.push('```')
+		for (const ref of await refs) {
+			const refDoc = await vscode.workspace.openTextDocument(ref.uri);
+			if (isCoveredBy(locs, ref)) {
+				continue
 			}
+			const start = new vscode.Position(ref.range.start.line, 0);
+			console.log(refDoc.getText(new vscode.Range(start, start.translate(1))))
 		}
-		promptLines.push('===symbol===')
-		promptLines.push(example.symbol)
-		promptLines.push('===code snippets===')
-		promptLines.push('````')
-		promptLines.push(selectionText)
-		promptLines.push('````')
-		promptLines.push('===symbol===')
-		const toRefactorSymbol = await openaiComplete(promptLines.join('\n'))
-		vscode.window
-			.showInformationMessage(`Do you want to refactor ${toRefactorSymbol}`, "Yes", "No")
-			.then(answer => {
-				if (answer === "Yes") {
-				// Run function
-				}
-			})
 	});
 
 	vscode.window.createTreeView('refactoringExamples', {
