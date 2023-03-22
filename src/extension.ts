@@ -85,6 +85,7 @@ async function openaiComplete(content: string) {
 		})
 		const reqObj = {
 			"model": "gpt-3.5-turbo",
+			"temperature": 0,
 			"messages": [
 				{
 					"role": "user",
@@ -92,6 +93,7 @@ async function openaiComplete(content: string) {
 				}
 			]
 		};
+		console.log(content)
 		req.write(JSON.stringify(reqObj));
 		req.end();
 	})
@@ -180,7 +182,7 @@ export function activate(context: vscode.ExtensionContext) {
 		for(const block of blocks) {
 			if (block.newContent) {
 				promptLines.push('```' + language)
-				promptLines.push(`//${block.oldFile}:${block.oldFileLineNumber}`);
+				promptLines.push(`//${block.oldContent ? '' : '+'}${block.oldFile}:${block.oldFileLineNumber}`);
 				promptLines.push(block.newContent);
 				promptLines.push('```')
 			}
@@ -199,15 +201,15 @@ export function activate(context: vscode.ExtensionContext) {
 			if (isCoveredBy(locs, ref)) {
 				continue
 			}
-			const start = new vscode.Position(ref.range.start.line, 0).translate(-2);
+			const start = new vscode.Position(ref.range.start.line, 0);
 			promptLines.push('```' + language)
 			promptLines.push(`//${path.relative(workspaceDir, ref.uri.fsPath)}:${start.line+1}`);
-			promptLines.push(refDoc.getText(new vscode.Range(start, start.translate(3))))
+			promptLines.push(refDoc.getText(new vscode.Range(start, start.translate(1))))
 			promptLines.push('```')
 		}
 		promptLines.push('only markdown code blocks')
 		promptLines.push('after refactoring:')
-		console.log(promptLines.join('\n'))
+		console.log(await openaiComplete(promptLines.join('\n')))
 	});
 
 	vscode.window.createTreeView('refactoringExamples', {

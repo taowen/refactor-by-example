@@ -21,8 +21,8 @@ export function parsePatch(patchContent: string) {
                     oldFileLineNumber,
                     oldFile: oldFile.substring(2),
                     newFile: newFile.substring(2),
-                    oldContent: oldBlock.slice(0, oldBlock.length - 1).join('\n'),
-                    newContent: newBlock.slice(0, newBlock.length - 1).join('\n')
+                    oldContent: oldBlock.join('\n'),
+                    newContent: newBlock.join('\n')
                 })
             }
             currentDiff = line.substring('diff --git '.length)
@@ -42,8 +42,9 @@ export function parsePatch(patchContent: string) {
         } else if (line.startsWith('-')) {
             oldBlock.push(line.substring(1))
         } else {
-            oldBlock.push(line.substring(1))
-            newBlock.push(line.substring(1))
+            if (newBlock.length === 0 && oldBlock.length === 0) {
+                oldFileLineNumber += 1
+            }
         }
     }
     return blocks;
@@ -52,28 +53,25 @@ export function parsePatch(patchContent: string) {
 // test case
 if (require.main === module) {
     const blocks = parsePatch(`
-commit 1427971b3ee60a1df71b4c6cc34ed63eb623edf9 (HEAD -> main, origin/main)
+commit da9844a273091da267c5f090af73e784017468e1 (HEAD -> main, origin/main)
 Author: Tao Wen <taowen@gmail.com>
-Date:   Sun Mar 19 21:22:49 2023 +0800
+Date:   Wed Mar 22 23:16:07 2023 +0800
 
-    a refactoring example
+    new refactoring example
 
 diff --git a/src/sample/app.ts b/src/sample/app.ts
-index 08a7066..32c9506 100644
+index ad55414..32c9506 100644
 --- a/src/sample/app.ts
 +++ b/src/sample/app.ts
-@@ -1,8 +1,8 @@
--import { executeOldCommand } from "./api";
-+import { executeNewCommand, executeOldCommand } from "./api";
- import { BrobCommand } from "./brob-command";
- import { VickCommand } from "./vick-command";
- 
- export function main() {
+@@ -3,6 +3,6 @@ import { BrobCommand } from "./brob-command";
+    import { VickCommand } from "./vick-command";
+    
+    export function main() {
 -    executeOldCommand(BrobCommand);
 +    executeNewCommand(BrobCommand);
-     executeOldCommand(VickCommand);
- }
-\\ No newline at end of file
+        executeOldCommand(VickCommand);
+    }
+\ No newline at end of file
 diff --git a/src/sample/brob-command.ts b/src/sample/brob-command.ts
 index fbae3db..31672c1 100644
 --- a/src/sample/brob-command.ts
@@ -83,19 +81,18 @@ index fbae3db..31672c1 100644
 +import { ICommand } from "./api";
 +
 +export class BrobCommand extends ICommand {
- }
-\\ No newline at end of file
+    }
+\ No newline at end of file
 diff --git a/src/sample/registry.ts b/src/sample/registry.ts
-new file mode 100644
-index 0000000..3a5ea14
---- /dev/null
+index 051f93b..3a5ea14 100644
+--- a/src/sample/registry.ts
 +++ b/src/sample/registry.ts
-@@ -0,0 +1,4 @@
-+import { registerNewCommand } from "./api";
+@@ -1 +1,4 @@
+    import { registerNewCommand } from "./api";
 +import { BrobCommand } from "./brob-command";
 +
 +registerNewCommand(BrobCommand)
-\\ No newline at end of file
+\ No newline at end of file
     `)
     if (blocks.length != 3) {
         throw new Error()
