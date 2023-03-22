@@ -116,27 +116,27 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', async (exampleId) => {
-		// const workspaceDir = getWorkspaceDir();
-		// if (!workspaceDir) {
-		// 	return;
-		// }
+		const workspaceDir = getWorkspaceDir();
+		if (!workspaceDir) {
+			return;
+		}
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
 			return;
 		}
 		const selectionText = editor.document.getText(editor.selection)
-		// const examples = await getExamples();
-		// const example = examples[exampleId]
-		// if (!example?.commit) {
-		// 	console.log('missing commit from example')
-		// 	return;
-		// }
-		// if (!example?.symbol) {
-		// 	console.log('missing symbol from example')
-		// 	return;
-		// }
-		// const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
-		// const blocks = parsePatch(patchContent);
+		const examples = await getExamples();
+		const example = examples[exampleId]
+		if (!example?.commit) {
+			console.log('missing commit from example')
+			return;
+		}
+		if (!example?.symbol) {
+			console.log('missing symbol from example')
+			return;
+		}
+		const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
+		const blocks = parsePatch(patchContent);
 		// const promptLines = ['extract symbol from code snippets:', '===code snippets==='];
 		// for(const block of blocks) {
 		// 	if (block.oldContent) {
@@ -166,18 +166,48 @@ export function activate(context: vscode.ExtensionContext) {
 		const decls: Thenable<vscode.LocationLink[]> = vscode.commands.executeCommand('vscode.executeDeclarationProvider', editor.document.uri, absPos)
 		const refs: Thenable<vscode.Location[]> = vscode.commands.executeCommand('vscode.executeReferenceProvider', editor.document.uri, absPos)
 		const locs = [...await defs, ...await decls]
+		const language = editor.document.languageId;
+		const promptLines = ['refactor the code according to following example.', 'before refactoring:'];
+		for(const block of blocks) {
+			if (block.oldContent) {
+				promptLines.push('```' + language)
+				promptLines.push(`//${block.oldFile}:${block.oldFileLineNumber}`);
+				promptLines.push(block.oldContent);
+				promptLines.push('```')
+			}
+		}
+		promptLines.push('after refactoring:')
+		for(const block of blocks) {
+			if (block.newContent) {
+				promptLines.push('```' + language)
+				promptLines.push(`//${block.oldFile}:${block.oldFileLineNumber}`);
+				promptLines.push(block.newContent);
+				promptLines.push('```')
+			}
+		}
+		promptLines.push('apply the pattern in the example above to the code below')
+		promptLines.push('before refactoring:')
 		for (const loc of locs) {
 			const locDoc = await vscode.workspace.openTextDocument(loc.targetUri);
-			console.log(locDoc.getText(loc.targetRange))
+			promptLines.push('```' + language)
+			promptLines.push(`//${path.relative(workspaceDir, loc.targetUri.fsPath)}:${loc.targetRange.start.line+1}`);
+			promptLines.push(locDoc.getText(loc.targetRange))
+			promptLines.push('```')
 		}
 		for (const ref of await refs) {
 			const refDoc = await vscode.workspace.openTextDocument(ref.uri);
 			if (isCoveredBy(locs, ref)) {
 				continue
 			}
-			const start = new vscode.Position(ref.range.start.line, 0);
-			console.log(refDoc.getText(new vscode.Range(start, start.translate(1))))
+			const start = new vscode.Position(ref.range.start.line, 0).translate(-2);
+			promptLines.push('```' + language)
+			promptLines.push(`//${path.relative(workspaceDir, ref.uri.fsPath)}:${start.line+1}`);
+			promptLines.push(refDoc.getText(new vscode.Range(start, start.translate(3))))
+			promptLines.push('```')
 		}
+		promptLines.push('only markdown code blocks')
+		promptLines.push('after refactoring:')
+		console.log(promptLines.join('\n'))
 	});
 
 	vscode.window.createTreeView('refactoringExamples', {

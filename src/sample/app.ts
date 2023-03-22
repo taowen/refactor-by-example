@@ -3,6 +3,6 @@ import { BrobCommand } from "./brob-command";
 import { VickCommand } from "./vick-command";
 
 export function main() {
-    executeNewCommand(BrobCommand);
+    executeOldCommand(BrobCommand);
     executeOldCommand(VickCommand);
 }
