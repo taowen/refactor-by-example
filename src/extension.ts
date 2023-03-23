@@ -6,6 +6,7 @@ import { PatchBlock, parsePatch } from './parsePatch';
 import * as fs from 'fs'
 import * as path from 'path'
 import * as https from 'https'
+import { parseRefactoredCode } from './parseRefactoredCode';
 
 type Example = { commit: string; symbol: string; }
 type Examples = Record<string, Example>;
@@ -225,34 +226,22 @@ async function refactor(exampleId: string) {
 	const locs = [...await defs, ...await decls]
 	const language = editor.document.languageId;
 	const refactoringPrompt = await generateRefactoringPrompt({blocks, language, locs, workspaceDir, refs: await refs })
-	console.log(await openaiComplete(refactoringPrompt))
+	const refactoredCode = await openaiComplete(refactoringPrompt)
+	const refactoredCodeBlocks = parseRefactoredCode(refactoredCode);
+	const edit = new vscode.WorkspaceEdit();
+	for (const block of refactoredCodeBlocks) {
+		const uri = vscode.Uri.file(path.join(workspaceDir, block.file))
+		if (block.insert) {
+			const start = new vscode.Position(block.lineNumber, 0);
+			edit.insert(uri, start, block.content.join('\n') + '\n', { label: 'refactoring', needsConfirmation: true })
+		} else {
+			const start = new vscode.Position(block.lineNumber - 1, 0);
+			const range = new vscode.Range(start, start.translate(block.content.length - 1));
+			edit.replace(uri, range, block.content.join('\n'), { label: 'refactoring', needsConfirmation: true })
+		}
+	}
+	vscode.workspace.applyEdit(edit, { isRefactoring: true });
 }
-
-/*
-```typescript
-//src/sample/vick-command.ts:1
-import { ICommand } from "./a,pi";
-
-export class VickCommand extends ICommand {
-}
-```
-```typescript
-//src/sample/app.ts:3
-import { VickCommand } from "./vick-command";
-
-```
-```typescript
-//src/sample/app.ts:7
-    executeNewCommand(VickCommand);
-
-```
-```typescript
-//+src/sample/registry.ts:2
-import { VickCommand } from "./vick-command";
-
-registerNewCommand(VickCommand)
-```
-*/
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
