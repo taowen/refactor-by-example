@@ -1,4 +1,4 @@
-interface Block {
+export interface PatchBlock {
     oldFile: string;
     newFile: string;
     oldFileLineNumber: number;
@@ -10,7 +10,7 @@ export function parsePatch(patchContent: string) {
     const lines = patchContent.split('\n')
     const oldBlock: string[] = []
     const newBlock: string[] = []
-    const blocks: Block[] = []
+    const blocks: PatchBlock[] = []
     let currentDiff:string = '';
     let oldFileLineNumber = 0;
     for (const [i, line] of lines.entries()) {
