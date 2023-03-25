@@ -17,10 +17,10 @@ export function parseRefactoredCode(refactoredCode: string) {
                 const nextLine = lines[i];
                 if (nextLine.startsWith('//+')) {
                     const [file, lineNumberText] = nextLine.substring(3).split(':')
-                    currentBlock = { insert: true, file, lineNumber: parseInt(lineNumberText), content: [] };
+                    currentBlock = { insert: true, file: file.replace(',', ''), lineNumber: parseInt(lineNumberText), content: [] };
                 } else {
                     const [file, lineNumberText] = nextLine.substring(2).split(':')
-                    currentBlock = { insert: false, file, lineNumber: parseInt(lineNumberText), content: [] };
+                    currentBlock = { insert: false, file: file.replace(',', ''), lineNumber: parseInt(lineNumberText), content: [] };
                 }
             } else {
                 blocks.push(currentBlock);
