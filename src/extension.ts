@@ -130,7 +130,7 @@ function generateSymbolExtractionPrompt(options: {
 async function generateRefactoringPrompt(options: {
 	blocks: PatchBlock[],
 	language: string,
-	locs: vscode.LocationLink[],
+	locs: vscode.Location[],
 	workspaceDir: string,
 	refs: vscode.Location[],
 }) {
@@ -156,10 +156,10 @@ async function generateRefactoringPrompt(options: {
 	promptLines.push('apply the pattern in the example above to the code below')
 	promptLines.push('before refactoring:')
 	for (const loc of locs) {
-		const locDoc = await vscode.workspace.openTextDocument(loc.targetUri);
+		const locDoc = await vscode.workspace.openTextDocument(loc.uri);
 		promptLines.push('```' + language)
-		promptLines.push(`//${path.relative(workspaceDir, loc.targetUri.fsPath)}:${loc.targetRange.start.line+1}`);
-		promptLines.push(locDoc.getText(loc.targetRange))
+		promptLines.push(`//${path.relative(workspaceDir, loc.uri.fsPath)}:${loc.range.start.line+1}`);
+		promptLines.push(locDoc.getText(loc.range))
 		promptLines.push('```')
 	}
 	for (const ref of await refs) {
@@ -178,16 +178,35 @@ async function generateRefactoringPrompt(options: {
 	return promptLines.join('\n')
 }
 
-function isCoveredBy(locs: vscode.LocationLink[], ref: vscode.Location) {
+function isCoveredBy(locs: vscode.Location[], ref: vscode.Location) {
 	for (const loc of locs) {
-		if (loc.targetUri.path !== ref.uri.path) {
+		if (loc.uri.path !== ref.uri.path) {
 			continue
 		}
-		if (loc.targetRange.contains(ref.range)) {
+		if (loc.range.contains(ref.range)) {
 			return true;
 		}
 	}
 	return false;
+}
+
+async function expandRange(loc: vscode.Location) {
+	if (!loc.range.isSingleLine) {
+		return loc;
+	}
+	await vscode.workspace.openTextDocument(loc.uri);
+	let expanded: any = await vscode.commands.executeCommand('vscode.executeSelectionRangeProvider', loc.uri, [loc.range.start]);
+	if (!expanded?.length) {
+		return loc;
+	}
+	expanded = expanded[0]
+	while (expanded?.parent) {
+		if(!expanded.range.isSingleLine) {
+			return new vscode.Location(loc.uri, expanded.range);
+		}
+		expanded = expanded.parent;
+	}
+	return new vscode.Location(loc.uri, expanded.range);
 }
 
 async function refactor(exampleId: string) {
@@ -212,35 +231,46 @@ async function refactor(exampleId: string) {
 	}
 	const patchContent = await execShell(`git show ${example.commit}`, { cwd: workspaceDir })
 	const blocks = parsePatch(patchContent);
-	const symbolExtractionPrompt = generateSymbolExtractionPrompt({ blocks, example, selectionText });
-	const toRefactorSymbol = await openaiComplete(symbolExtractionPrompt)
-	const answer = await vscode.window.showInformationMessage(`Do you want to refactor ${toRefactorSymbol}`, "Yes", "No");
-	if (answer !== "Yes") {
+	// const symbolExtractionPrompt = generateSymbolExtractionPrompt({ blocks, example, selectionText });
+	// const toRefactorSymbol = await openaiComplete(symbolExtractionPrompt)
+	// const answer = await vscode.window.showInformationMessage(`Do you want to refactor ${toRefactorSymbol}`, "Yes", "No");
+	// if (answer !== "Yes") {
+	// 	return;
+	// }
+	const relativePos = selectionText.indexOf('CancelPlacingImageCommand');
+	if (relativePos === -1) {
 		return;
 	}
-	const relativePos = selectionText.indexOf(toRefactorSymbol);
-	const absPos = editor.selection.start.translate(undefined, relativePos)
-	const defs: Thenable<vscode.LocationLink[]> = vscode.commands.executeCommand('vscode.executeDefinitionProvider', editor.document.uri, absPos)
-	const decls: Thenable<vscode.LocationLink[]> = vscode.commands.executeCommand('vscode.executeDeclarationProvider', editor.document.uri, absPos)
+	const absOffset = editor.document.offsetAt(editor.selection.start) + relativePos
+	const absPos = editor.document.positionAt(absOffset)
+	const defs: Thenable<vscode.Location[]> = vscode.commands.executeCommand('vscode.executeDefinitionProvider', editor.document.uri, absPos)
+	// const decls: Thenable<vscode.Location[]> = vscode.commands.executeCommand('vscode.executeDeclarationProvider', editor.document.uri, absPos)
 	const refs: Thenable<vscode.Location[]> = vscode.commands.executeCommand('vscode.executeReferenceProvider', editor.document.uri, absPos)
-	const locs = [...await defs, ...await decls]
+	const locs: vscode.Location[] = []
+	for (const loc of await defs) {
+		locs.push(await expandRange(loc));
+	}
+	// for (const loc of await decls) {
+	// 	locs.push(await expandRange(loc));
+	// }
 	const language = editor.document.languageId;
 	const refactoringPrompt = await generateRefactoringPrompt({blocks, language, locs, workspaceDir, refs: await refs })
-	const refactoredCode = await openaiComplete(refactoringPrompt)
-	const refactoredCodeBlocks = parseRefactoredCode(refactoredCode);
-	const edit = new vscode.WorkspaceEdit();
-	for (const block of refactoredCodeBlocks) {
-		const uri = vscode.Uri.file(path.join(workspaceDir, block.file))
-		if (block.insert) {
-			const start = new vscode.Position(block.lineNumber, 0);
-			edit.insert(uri, start, block.content.join('\n') + '\n', { label: 'refactoring', needsConfirmation: true })
-		} else {
-			const start = new vscode.Position(block.lineNumber - 1, 0);
-			const range = new vscode.Range(start, start.translate(block.content.length - 1));
-			edit.replace(uri, range, block.content.join('\n'), { label: 'refactoring', needsConfirmation: true })
-		}
-	}
-	vscode.workspace.applyEdit(edit, { isRefactoring: true });
+	console.log(refactoringPrompt)
+	// const refactoredCode = await openaiComplete(refactoringPrompt)
+	// const refactoredCodeBlocks = parseRefactoredCode(refactoredCode);
+	// const edit = new vscode.WorkspaceEdit();
+	// for (const block of refactoredCodeBlocks) {
+	// 	const uri = vscode.Uri.file(path.join(workspaceDir, block.file))
+	// 	if (block.insert) {
+	// 		const start = new vscode.Position(block.lineNumber, 0);
+	// 		edit.insert(uri, start, block.content.join('\n') + '\n', { label: 'refactoring', needsConfirmation: true })
+	// 	} else {
+	// 		const start = new vscode.Position(block.lineNumber - 1, 0);
+	// 		const range = new vscode.Range(start, start.translate(block.content.length - 1));
+	// 		edit.replace(uri, range, block.content.join('\n'), { label: 'refactoring', needsConfirmation: true })
+	// 	}
+	// }
+	// vscode.workspace.applyEdit(edit, { isRefactoring: true });
 }
 
 // This method is called when your extension is activated
@@ -250,7 +280,13 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', refactor);
+	let disposable = vscode.commands.registerCommand('refactor-by-example.refactor', async(exampleId: string) => {
+		try {
+			await refactor(exampleId)
+		} catch(e) {
+			console.error('failed to refactor', e);
+		}
+	});
 
 	vscode.window.createTreeView('refactoringExamples', {
 		treeDataProvider: new RefactoringExamplesProvider()
